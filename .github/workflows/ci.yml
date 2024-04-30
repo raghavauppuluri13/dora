@@ -271,9 +271,13 @@ jobs:
           cargo build --all
           dora start dataflow.yml --name ci-rust-test
           sleep 10
-          dora stop --name ci-rust-test
-          cd ..
-
+          dora stop --name ci-rust-test  --grace-duration 5s
+          dora destroy
+      - name: "Test CLI (Python)"
+        timeout-minutes: 30
+        # fail-fast by using bash shell explictly
+        shell: bash
+        run: |
           # Test Python template Project
           pip3 install maturin
           maturin build -m apis/python/node/Cargo.toml
@@ -282,9 +286,7 @@ jobs:
           cd test_python_project
           dora start dataflow.yml --name ci-python-test
           sleep 10
-          dora stop --name ci-python-test
-          cd ..
-
+          dora stop --name ci-python-test  --grace-duration 5s
           dora destroy
 
   clippy:

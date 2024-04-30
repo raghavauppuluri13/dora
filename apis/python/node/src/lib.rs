@@ -6,7 +6,6 @@ use arrow::pyarrow::{FromPyArrow, ToPyArrow};
 use dora_node_api::merged::{MergeExternalSend, MergedEvent};
 use dora_node_api::{DoraNode, EventStream};
 use dora_operator_api_python::{pydict_to_metadata, PyEvent};
-use dora_ros2_bridge_python::Ros2Subscription;
 use eyre::Context;
 use futures::{Stream, StreamExt};
 use pyo3::prelude::*;
@@ -119,38 +118,6 @@ impl Node {
     pub fn dataflow_descriptor(&self, py: Python) -> pythonize::Result<PyObject> {
         pythonize::pythonize(py, self.node.dataflow_descriptor())
     }
-
-    pub fn merge_external_events(
-        &mut self,
-        subscription: &mut Ros2Subscription,
-    ) -> eyre::Result<()> {
-        let subscription = subscription.into_stream()?;
-        let stream = futures::stream::poll_fn(move |cx| {
-            let s = subscription.as_stream().map(|item| {
-                match item.context("failed to read ROS2 message") {
-                    Ok((value, _info)) => Python::with_gil(|py| {
-                        value
-                            .to_pyarrow(py)
-                            .context("failed to convert value to pyarrow")
-                            .unwrap_or_else(|err| PyErr::from(err).to_object(py))
-                    }),
-                    Err(err) => Python::with_gil(|py| PyErr::from(err).to_object(py)),
-                }
-            });
-            futures::pin_mut!(s);
-            s.poll_next_unpin(cx)
-        });
-
-        // take out the event stream and temporarily replace it with a dummy
-        let events = std::mem::replace(
-            &mut self.events,
-            Events::Merged(Box::new(futures::stream::empty())),
-        );
-        // update self.events with the merged stream
-        self.events = Events::Merged(events.merge_external_send(Box::pin(stream)));
-
-        Ok(())
-    }
 }
 
 enum Events {
@@ -206,12 +173,6 @@ pub fn start_runtime() -> eyre::Result<()> {
 fn dora(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(start_runtime, m)?)?;
     m.add_class::<Node>().unwrap();
-
-    let ros2_bridge = PyModule::new(py, "ros2_bridge")?;
-    dora_ros2_bridge_python::create_dora_ros2_bridge_module(ros2_bridge)?;
-    let experimental = PyModule::new(py, "experimental")?;
-    experimental.add_submodule(ros2_bridge)?;
-    m.add_submodule(experimental)?;
 
     Ok(())
 }
