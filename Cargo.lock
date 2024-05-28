@@ -1636,6 +1636,7 @@ dependencies = [
 name = "dora-node-api-c"
 version = "0.3.3"
 dependencies = [
+ "arrow",
  "arrow-array",
  "dora-node-api",
  "eyre",
