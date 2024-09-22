@@ -1,6 +1,6 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 use arrow_array::UInt8Array;
-use arrow_array::{Array, Float32Array, Int32Array};
+use arrow_array::{Array, Float32Array, Int32Array, UInt64Array};
 use dora_node_api::{arrow::array::AsArray, DoraNode, Event, EventStream};
 use eyre::Context;
 use std::sync::Arc;
@@ -324,6 +324,38 @@ pub unsafe extern "C" fn dora_send_output_f32(
     }
 }
 
+/// Sends the given output to subscribed dora nodes/operators.
+///
+/// The `id_ptr` and `id_len` fields must be the start pointer and length of an
+/// UTF8-encoded string. The ID string must correspond to one of the node's
+/// outputs specified in the dataflow YAML file.
+///
+/// The `data_ptr` and `data_len` fields must be the start pointer and length
+/// a byte array. The dora API sends this data as-is, without any processing.
+///
+/// ## Safety
+///
+/// - The `id_ptr` and `id_len` fields must be the start pointer and length of an
+///   UTF8-encoded string.
+/// - The `data_ptr` and `data_len` fields must be the start pointer and length
+///   a byte array.
+#[no_mangle]
+pub unsafe extern "C" fn dora_send_output_u64(
+    context: *mut c_void,
+    id_ptr: *const u8,
+    id_len: usize,
+    data_ptr: *const u64,
+    data_len: usize,
+) -> isize {
+    match unsafe { try_send_output(context, id_ptr, id_len, data_ptr, data_len) } {
+        Ok(()) => 0,
+        Err(err) => {
+            tracing::error!("{err:?}");
+            -1
+        }
+    }
+}
+
 pub trait ToArrow {
     fn to_arrow(self) -> Arc<dyn Array>;
 }
@@ -338,6 +370,13 @@ impl ToArrow for &[f32] {
 impl ToArrow for &[i32] {
     fn to_arrow(self) -> Arc<dyn Array> {
         let array = Int32Array::from(self.to_vec());
+        Arc::new(array)
+    }
+}
+
+impl ToArrow for &[u64] {
+    fn to_arrow(self) -> Arc<dyn Array> {
+        let array = UInt64Array::from(self.to_vec());
         Arc::new(array)
     }
 }

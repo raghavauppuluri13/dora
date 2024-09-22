@@ -1,6 +1,7 @@
 #ifndef DORA_NODE_API_H
 #define DORA_NODE_API_H
 #include <stddef.h>
+#include <stdint.h>
 
 void *init_dora_context_from_env();
 void free_dora_context(void *dora_context);
@@ -26,5 +27,7 @@ int dora_send_output(void *dora_context, char *id_ptr, size_t id_len,
                      char *data_ptr, size_t data_len);
 int dora_send_output_f32(void *dora_context, char *id_ptr, size_t id_len,
                          float *data_ptr, size_t data_len);
+int dora_send_output_u64(void *dora_context, char *id_ptr, size_t id_len,
+                         uint64_t *data_ptr, size_t data_len);
 
 #endif
